@@ -2,6 +2,11 @@ import java.io.DataOutputStream;
 import java.net.Socket;
 
 public class Client {
+    /**
+     * A simple client that connects to a server on localhost:6666.
+     * TODO: listen for SSH logs and implement a way to send them as byte frames to the server in real-time.
+     * @param args Command line arguments (not used).
+     */
     public static void main(String[] args) {
         try {
             System.out.println("Starting client...");
