@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.time.LocalDateTime;
 
-public class ClientHandler implements Runnable{
+public class ClientHandler implements Runnable {
     /**
      * ClientHandler is a Runnable class that handles incoming client connections.
      * It reads data from the client in fixed-size chunks and processes it.
