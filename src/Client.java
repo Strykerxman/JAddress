@@ -1,37 +1,55 @@
-import java.io.DataOutputStream;
 import java.net.Socket;
+import java.util.Scanner;
+
 
 public class Client {
     /**
      * A simple client that connects to a server on localhost:6666.
-     * TODO: listen for incidents and implement a way to send them as byte frames to the server in real-time.
+     * Allows for sending strings through console input to the server for processing.
+     * The client will continue to prompt for input until the user types 'close' to exit
      */
     public static void main(String[] args) {
-        try {
-            System.out.println("[INFO] Starting client...");
-            Socket client = new Socket("localhost", 6666);
-            // Initialize client socket with local address
-            DataOutputStream out = new DataOutputStream(client.getOutputStream());
-            // Create out stream to send data
+        Socket socket = null;
 
-            byte[] message = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".getBytes();
-            System.out.println("[INFO] Sending \"" + new String(message)+"\" to server!");
-            out.writeInt(message.length);
-            out.write(message, 0, 3);
-            out.write(message, 3, 10);
-            out.write(message, 13, 13);
+        try (Scanner sc = new Scanner(System.in)) {
+            System.out.println("[INFO] Connecting to Address Intelligence Server on port 6666...");
+            socket = new Socket("localhost", 6666);
+            BinaryWireProtocol wire = new BinaryWireProtocol(socket);
+            System.out.println("[SUCCESS] Connected!");
+            System.out.println("--------------------------------------------------");
+            System.out.println("Commands: Type any address to look it up, or type 'close' to exit.");
+            System.out.println("--------------------------------------------------");
 
-            byte[] hi = "Hi".getBytes();
-            System.out.println("[INFO] Sending \"" + new String(hi)+"\" to server!");
-            out.writeInt(hi.length);
-            out.write(hi, 0, 1);
-            out.write(hi, 1, 1);
+            while (true) {
+                System.out.println("Address Search> ");
+                String input = sc.nextLine();
 
-            System.out.println("[INFO] Stopping...");
-            client.close(); // Sends FIN packet to server on port 6666 as a XXXXX port
-        }
-        catch (Exception e) {
-            System.out.println("Client error: " + e);
+                if (input.trim().isEmpty()) {
+                    System.out.println("[INFO] No input provided. Please enter a valid address or 'close' to exit.");
+                    continue;
+                }
+                if (input.equalsIgnoreCase("close")) {
+                    System.out.println("[INFO] Closing connection...");
+                    break;
+                }
+
+                System.out.println("[INFO] Sending request for address: " + input);
+                wire.writeMessage(BinaryWireProtocol.ServerCode.LOOKUP, input);
+
+                System.out.println("[INFO] Waiting for server response...");
+                wire.receiveServerResponse();
+                System.out.println();
+            }
+        } catch (Exception e) {
+            System.out.println("[ERROR] Client execution failed: " + e.getMessage());
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    socket.close();
+                    System.out.println("[INFO] Socket connection closed cleanly.");
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 }
