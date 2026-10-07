@@ -17,7 +17,7 @@ public class ServerMetrics {
 
     public static String getActiveConnections() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Active Connections:\n");
+        sb.append("[METRICS] Active Connections:\n");
         for (Map.Entry<Long, ConnectionInfo> entry : ACTIVE_CONNECTIONS.entrySet()) {
             sb.append("Thread ID: ").append(entry.getKey())
               .append(", Remote Address: ").append(entry.getValue().remoteAddress())
