@@ -20,15 +20,12 @@ public class ServerMetrics {
         sb.append("[METRICS] Active Connections:\n");
         for (Map.Entry<Long, ConnectionInfo> entry : ACTIVE_CONNECTIONS.entrySet()) {
             sb.append("Thread ID: ").append(entry.getKey())
-              .append(", Remote Address: ").append(entry.getValue().remoteAddress())
-              .append(", Connected At: ").append(entry.getValue().connectedAt())
-              .append("\n");
+                    .append(", Remote Address: ").append(entry.getValue().remoteAddress())
+                    .append(", Connected At: ").append(entry.getValue().connectedAt())
+                    .append("\n");
         }
         return sb.toString();
     }
 
     private record ConnectionInfo(String remoteAddress, Instant connectedAt) {}
 }
-
-
-

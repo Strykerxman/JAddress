@@ -25,49 +25,59 @@ public class Client {
 
     public void start() {
         try {
-            while (true) {
+            while (!socket.isClosed()) {
                 String input = getUserInput();
-                validateInput(input);
+                if (!validateInput(input)) continue;
 
                 if(checkExitCondition(input)) {
                     System.out.println("[INFO] Closing client connection...");
+                    wire.writeMessage(BinaryWireProtocol.ServerCode.CLOSE, "Client requesting disconnect");
+                    handleServerReply();
                     break;
                 }
-                sendMessage(input);
-                listenServerResponse();
+                wire.writeMessage(BinaryWireProtocol.ServerCode.LOOKUP, input);
+                handleServerReply();
             }
         }
         catch (Exception e) {
             System.out.println("[ERROR] Client execution failed: " + e.getMessage());
         }
-        finally { teardown(); }
+        finally { stop(); }
     }
-    private void teardown() {
-        if (scanner != null) scanner.close();
-
+    private void stop() {
+        // request / tell server to close when user enters 'close'
+        // notify server, request close permission
+        // wait for handshake, go here when break;
+        // closes AFTER handler
         if (socket != null && !socket.isClosed()) {
             try {
                 socket.close();
-                System.out.println("[INFO] Socket connection closed cleanly.");
-            } catch (Exception ignored) {}
+                System.out.println("[INFO] Socket connection closed cleanly");
+            }
+            catch (Exception e) {
+                System.out.println("[WARN] Error closing client socket: " + e.getMessage());
+            }
         }
+
     }
-    private void sendMessage(String message) throws IOException {
-        wire.writeMessage(BinaryWireProtocol.ServerCode.LOOKUP, message);
-    }
-    private void listenServerResponse() throws IOException {
+    private void handleServerReply() throws IOException {
         System.out.println("[INFO] Waiting for server response...");
-        wire.receiveServerResponse();
-        System.out.println();
+        ProtocolFrame response = wire.readIncomingFrame();
+
+        String hexCode = String.format("0x%02X", response.command().getCode());
+        System.out.println("[INFO] Server Response: STATUS CODE " + hexCode +
+                " (" + response.command().name() + ") | Message: " + response.payload());
     }
     private String getUserInput() {
-        System.out.println("Address Search> ");
-        return scanner.nextLine();
+        System.out.print("Address Search> ");
+        return scanner.hasNextLine() ? scanner.nextLine() : "close";
     }
-    private void validateInput(String input) {
-        if (input.trim().isEmpty()) {
-            throw new IllegalArgumentException("Input cannot be empty.");
+    private boolean validateInput(String input) {
+        if (input == null || input.trim().isEmpty()) {
+            System.out.println("[WARN] Input cannot be empty. Please enter a valid address or 'close' to exit.");
+            return false;
         }
+        return true;
     }
     private boolean checkExitCondition(String input) {
         return input.equalsIgnoreCase("close");
@@ -76,7 +86,8 @@ public class Client {
         try { // Initialize connection with socket, use protocol to handle communication on that socket
             Client client = new Client("localhost", 6666);
             client.start();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             System.out.println("[ERROR] Client execution failed: " + e.getMessage());
         }
     }

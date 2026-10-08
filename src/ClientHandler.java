@@ -1,5 +1,3 @@
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
@@ -12,44 +10,47 @@ public class ClientHandler implements Runnable {
      * The class also manages thread registration and unregistration for metrics tracking.
      */
     private final Socket socket;
+    private final BinaryWireProtocol wire;
+    private long threadId;
+    private final String remoteAddress;
 
-    public ClientHandler(Socket s) {
-        this.socket = s;
+    public ClientHandler(Socket socket) throws IOException {
+        this.socket = socket;
+        this.wire = new BinaryWireProtocol(socket);
+        this.remoteAddress = socket.getRemoteSocketAddress().toString();
     }
 
     @Override
     public void run() {
+        this.threadId = Thread.currentThread().threadId();
+        ServerMetrics.registerThread(threadId, remoteAddress);
         try {
-            BinaryWireProtocol wire = initHandler();
-
-            while (true) { // Loop until EOF, caught by EOFException
-                wire.handleIncomingRequest();
+            while (!socket.isClosed()) { // Loop until EOFException
+                ProtocolFrame frame = wire.readIncomingFrame();
+                switch (frame.command()) {
+                    case LOOKUP -> wire.writeMessage(BinaryWireProtocol.ServerCode.OK, "Address verified successfully");
+                    case CLOSE -> {
+                        System.out.println("[INFO] Thread-" + threadId + " processing CLOSE request. Acknowledging...");
+                        wire.writeMessage(BinaryWireProtocol.ServerCode.CLOSE, "Server acknowledging close handshake");
+                        System.out.println("[INFO] Thread-" + threadId + " waiting for client to drop hardware link...");
+                        // When the client closes its socket, this read will throw an EOFException
+                        wire.readIncomingFrame();
+                    }
+                    default -> wire.writeMessage(BinaryWireProtocol.ServerCode.OK, "Command processed successfully");
+                }
             }
         }
         catch (EOFException e) { // Thread sees FIN packet
-            System.out.println("[Thread-" + Thread.currentThread().threadId()+"] finished at "+ LocalDateTime.now());
-            System.out.println();
+            System.out.println("[INFO] Thread-" + threadId + " finished cleanly via handshake at "+ LocalDateTime.now());
         }
         catch (IOException e) {
-            System.out.println("[Thread-" + Thread.currentThread().threadId() + "] Client disconnected abruptly: " + e.getMessage());
+            System.out.println("[WARN] Thread-" + threadId + " Client disconnected abruptly: " + e.getMessage());
         }
         finally {
-            try { // Attempt closing the socket
-                System.out.println("[Thread-" + Thread.currentThread().threadId() + "] Closing connection to: " + this.socket.getRemoteSocketAddress());
-                System.out.println("[Thread-" + Thread.currentThread().threadId() + "] Active connections remaining (self-included): " + ServerMetrics.getActiveConnections());
-                System.out.println("[Thread-" + Thread.currentThread().threadId() + "] Stopping...");
-                ServerMetrics.unregisterThread(Thread.currentThread().threadId());
-                Server.threadCount.decrementAndGet();
+            ServerMetrics.unregisterThread(threadId);
+            try {
                 this.socket.close();
             } catch (IOException ignored) {}
         }
-    }
-    public BinaryWireProtocol initHandler() {
-        Server.threadCount.incrementAndGet();
-        long threadId = Thread.currentThread().threadId();
-        String remoteAddress = this.socket.getRemoteSocketAddress().toString();
-        ServerMetrics.registerThread(threadId, remoteAddress);
-
-        return new BinaryWireProtocol(this.socket);
     }
 }

@@ -1,37 +1,31 @@
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Server {
-    /**
-     * A simple server that listens for incoming connections on port 6666.
-     * It will accept connections from clients for reading data like SSH logs and other information.
-     * It spawns a new thread for each client connection to handle communication.
-     * The server runs indefinitely until manually stopped (e.g., Ctrl+C).
-     *
-     * Future: MCP thread will read tickets -> read-write concurrency concern.
-     */
-    public final static AtomicInteger threadCount = new AtomicInteger(0);
+    private static final int PORT = 6666;
 
     public static void main(String[] args) {
-        System.out.println("Starting server on port 6666...");
+        System.out.println("Starting server on port " + PORT + "...");
 
-        try {
-            ServerSocket serverSocket = new ServerSocket(6666); // Initialize new listener on port: 6666
-            System.out.println("Server started! Listening on port 6666.");
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            System.out.println("Server started! Listening on port " + PORT + ".\n");
 
-            while (true) { // Continuous listening (force close with Ctrl+C)
-                Socket someClient = serverSocket.accept(); // Accept incoming connection
-                System.out.println("Incoming: "+someClient.getRemoteSocketAddress());
-                System.out.println("Client connecting to: "+someClient.getLocalSocketAddress());
+            while (!serverSocket.isClosed()) {
+                Socket clientSocket = serverSocket.accept();
+
+                System.out.println("[SERVER] Incoming connection channel opened.");
+                System.out.println("  > Remote Endpoint: " + clientSocket.getRemoteSocketAddress());
                 System.out.println();
 
-                new Thread(new ClientHandler(someClient)).start();
-                // Pass client onto a new thread so server can run multiple client requests simultaneously
+                ClientHandler handler = new ClientHandler(clientSocket);
+                Thread workerThread = new Thread(handler);
+                workerThread.setName("ClientHandler-" + clientSocket.getRemoteSocketAddress());
+                workerThread.start();
             }
         }
-        catch (Exception e) { // Catch errors while server is running
-            System.out.println("Server Error: " + e);
+        catch (IOException e) {
+            System.out.println("[CRITICAL] Server execution encountered an error: " + e.getMessage());
         }
     }
 }
