@@ -1,7 +1,8 @@
 JAddress
 --------
 
-A custom Java TCP Socket Server using a lightweight, proprietary Binary Wire Protocol. The system loads geospatial address records from a relational structure into thread-safe, in-memory data structures for sub-millisecond lookups.
+A custom Java TCP Socket Server using a lightweight, proprietary Binary Wire Protocol. This allows a client to connect to a server, communicate with it via the client console and get a response back from the server.  
+IN DEVELOPMENT: The system loads geospatial address records from a relational structure into thread-safe, in-memory data structures for sub-millisecond lookups.
 
 ## Run the demo
 Firstly, travel to the *src* directory and compile the Java files.
