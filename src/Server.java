@@ -1,17 +1,37 @@
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class Server {
-    private static final int PORT = 6666;
+public class Server implements Runnable {
+    private final int port;
+    private final ExecutorService threadPool;
+    private ServerSocket serverSocket;
+    private volatile boolean isRunning;
 
-    public static void main(String[] args) {
-        System.out.println("Starting server on port " + PORT + "...");
+    public Server(int port) {
+        this.port = port;
+        this.threadPool = Executors.newFixedThreadPool(50);
+    }
 
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server started! Listening on port " + PORT + ".\n");
+    public void start() {
+        if (!isRunning) {
+            isRunning = true;
+            Thread serverThread = new Thread(this, "Server-Main-Loop");
+            serverThread.start();
+        }
+    }
 
-            while (!serverSocket.isClosed()) {
+    @Override
+    public void run() {
+        System.out.println("Starting server on port " + port + "...");
+
+        try (ServerSocket socket = new ServerSocket(port)) {
+            this.serverSocket = socket;
+            System.out.println("Server started! Listening on port " + port + "\n");
+
+            while(isRunning && !serverSocket.isClosed()) {
                 Socket clientSocket = serverSocket.accept();
 
                 System.out.println("[SERVER] Incoming connection channel opened.");
@@ -19,13 +39,34 @@ public class Server {
                 System.out.println();
 
                 ClientHandler handler = new ClientHandler(clientSocket);
-                Thread workerThread = new Thread(handler);
-                workerThread.setName("ClientHandler-" + clientSocket.getRemoteSocketAddress());
-                workerThread.start();
+                threadPool.execute(handler);
             }
         }
         catch (IOException e) {
-            System.out.println("[CRITICAL] Server execution encountered an error: " + e.getMessage());
+            System.out.println("[ERROR] Could not bind to port "+ port +": "+e.getMessage());
         }
+        finally { stop(); }
+    }
+
+    public synchronized void stop() {
+        if (!isRunning) return;
+
+        System.out.println("Stopping server...");
+        isRunning = false;
+
+        try {
+            if(serverSocket != null && !serverSocket.isClosed())
+                serverSocket.close();
+        }
+        catch (IOException e) {
+            System.out.println("[ERROR] Problem closing server socket: " + e.getMessage());
+        }
+        threadPool.close();
+        System.out.println("Server fully stopped");
+    }
+
+    public static void main(String[] args) {
+        Server myServer = new Server(6666);
+        myServer.start();
     }
 }
